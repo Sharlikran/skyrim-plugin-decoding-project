@@ -64,8 +64,6 @@ var
   wbSpecialTypeEnum: IwbEnumDef;
   wbLGDIStarSlot: IwbEnumDef;
   wbMapMarkerEnum: IwbEnumDef;
-  wbPrefixEnum: IwbEnumDef;
-  wbSuffixEnum: IwbEnumDef;
   wbCellFlags: IwbFlagsDef;
   wbLVLFFlags : IwbFlagsDef;
   wbLVLNLVLFFlags : IwbFlagsDef;
@@ -6317,14 +6315,6 @@ begin
     'Third Star Slot',
     'Fourth Star Slot',
     'Fifth Star Slot'
-  ]);
-
-  wbPrefixEnum := wbEnum([
-
-  ]);
-
-  wbSuffixEnum := wbEnum([
-
   ]);
 
   wbEDID := wbStringKC(EDID, 'Editor ID', 0, cpOverride);
@@ -19034,7 +19024,8 @@ begin
     wbInteger(PTPR, 'Is Prefix', itU8, wbBoolEnum),
     wbInteger(PTSU, 'Is Suffix', itU8, wbBoolEnum),
     wbInteger(PTDS, 'Is Default Title', itU8, wbBoolEnum),
-    wbConditions
+    wbCTDA
+   //wbConditions //For PR 1393
   ]);
 
   wbAddGroupOrder(GMST);
