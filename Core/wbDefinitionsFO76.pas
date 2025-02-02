@@ -64,6 +64,8 @@ var
   wbSpecialTypeEnum: IwbEnumDef;
   wbLGDIStarSlot: IwbEnumDef;
   wbMapMarkerEnum: IwbEnumDef;
+  wbPrefixEnum: IwbEnumDef;
+  wbSuffixEnum: IwbEnumDef;
   wbCellFlags: IwbFlagsDef;
   wbLVLFFlags : IwbFlagsDef;
   wbLVLNLVLFFlags : IwbFlagsDef;
@@ -6317,6 +6319,14 @@ begin
     'Fifth Star Slot'
   ]);
 
+  wbPrefixEnum := wbEnum([
+
+  ]);
+
+  wbSuffixEnum := wbEnum([
+
+  ]);
+
   wbEDID := wbStringKC(EDID, 'Editor ID', 0, cpOverride);
   wbFULL := wbLStringKC(FULL, 'Name', 0, cpTranslate);
   wbFULLActor := wbLStringKC(FULL, 'Name', 0, cpTranslate, False, nil{wbActorTemplateUseBaseData});
@@ -10702,6 +10712,7 @@ begin
       {0x00000200}  9, 'Unknown 9'
     ])), [
     wbEDID,
+    wbFTAGs,
     wbXALG,
     wbInteger(FNAM, 'Type', itU8, wbEnum([], [
       Ord('s'), 'Short',
@@ -10990,7 +11001,11 @@ begin
       wbString(NAM1, 'Model FileName'),
       wbModelInfo(NAM2)
     ], [], cpNormal, True),
-    wbInteger(VNAM, 'Sound Level', itU32, wbSoundLevelEnum, cpNormal, True)
+    wbInteger(VNAM, 'Sound Level', itU32, wbSoundLevelEnum, cpNormal, True),
+    wbFormIDCk(PSCT, 'Speed Curve Table', [CURV, NULL]),
+    wbFormIDCk(PSSC, 'Seek Strength Curve Table', [CURV, NULL]),
+    wbFloat(PFDX, 'X-Axis Drag'),
+    wbFloat(PFDZ, 'Z-Axis Drag')
   ]);
 
   wbRecord(HAZD, 'Hazard', [
@@ -11159,6 +11174,8 @@ begin
    wbRecord(EXPL, 'Explosion', [
     wbEDID,
     wbOBND(True),
+    wbFULL,
+    wbDESC,
     wbPHST,
     wbOPDSs,
     wbFULL,
@@ -13988,6 +14005,7 @@ begin
       wbLVOC,
       wbLVOT,
       wbLVIV,
+      wbLVIT,
       wbLVIG,
       wbLVLV,
       wbLVOG,
@@ -14508,6 +14526,7 @@ begin
     wbDEFL,
     wbPHST,
     wbXALG,
+    wbFTAGs,
     wbStruct(ACBS, 'Configuration', [
       wbInteger('Flags', itU32, wbFlags([
         {0x00000001} 'Female',
@@ -14955,6 +14974,7 @@ begin
   wbRecord(PACK, 'Package', [
     wbEDID,
     wbVMADFragmentedPACK,
+    wbFTAGs,
 
     wbStruct(PKDT, 'Pack Data', [
       wbInteger('General Flags', itU32, wbPKDTFlags),
@@ -15667,6 +15687,7 @@ begin
     wbString(DURL, 'Group Name'),
     wbSTCP,
     wbFULL,
+    wbFTAGs,
     wbDESCReq,
     wbSPCT,
     wbSPLOs,
@@ -16203,6 +16224,40 @@ begin
     wbInteger(XAMC, 'Ammo Count', itU32),
     wbEmpty(XLKT, 'Linked Ref Transient'),
     wbFormIDCk(XLYR, 'Layer', [LAYR]),
+    wbStruct(XRLL, 'Lighting Volume - Lighting', [
+      wbByteColors('Ambient Color'),
+      wbByteColors('Directional Color'),
+      wbByteColors('Fog Color Near'),
+      wbFloat('Fog Near'),
+      wbFloat('Fog Far'),
+      wbInteger('Directional Rotation XY', itS32),
+      wbInteger('Directional Rotation Z', itS32),
+      wbFloat('Directional Fade'),
+      wbFloat('Fog Clip Distance'),
+      wbFloat('Fog Power'),
+      wbUnused(32),
+      wbByteColors('Fog Color Far'),
+      wbFloat('Fog Max'),
+      wbFloat('Light Fade Begin'),
+      wbFloat('Light Fade End'),
+      wbUnused(4),
+      wbFloat('Near Height Mid'),
+      wbFloat('Near Height Range'),
+      wbByteColors('Fog Color High Near'),
+      wbByteColors('Fog Color High Far'),
+      wbFloat('High Density Scale'),
+      wbFloat('Fog Near Scale'),
+      wbFloat('Fog Far Scale'),
+      wbFloat('Fog High Near Scale'),
+      wbFloat('Fog High Far Scale'),
+      wbFloat('Far Height Mid'),
+      wbFloat('Far Height Range'),
+      wbStruct('Skybox Bounds', [
+        wbVec3('Center'),
+        wbVec3('Radius')
+      ])
+    ], cpNormal, False, nil, 15).IncludeFlag(dfCollapsed, wbCollapseFlags),
+    wbFormIDCk(XRL2, 'Lighting Volume - Lighting Template', [LGTM]),
     wbFormIDCk(XMSP, 'Material Swap', [MSWP]),
     wbXLWT,
     wbFormIDCk(XRFG, 'Reference Group', [RFGP]),
@@ -18101,6 +18156,7 @@ begin
     wbXFLG,
     wbFormID(CNAM, 'Category'),
     wbFormID(DNAM, 'Animation'),
+    wbLStringKC(ACTV, 'Chat Box Text', 0, cpTranslate),
     wbKeywords
   ]);
 
@@ -18757,7 +18813,11 @@ begin
       'Fast',
       'Very Fast'
     ])),
-    wbDAMS
+    wbDAMS,
+    wbFloat(WTDT, 'Telegraphed Time'),
+    wbFormIDCk(WTDA, 'Telegraghed Art Object', [RFCT]),
+    wbFormIDCk(WTDS, 'Telegraphed Sound Effect', [SNDR]),
+    wbFloat(WSAM, 'Telegraphed Sound Amplitude')
   ], False, nil, cpNormal, False, nil{wbWEAPAfterLoad});
 
   wbRecord(WTHR, 'Weather',
@@ -18966,6 +19026,17 @@ begin
     ]).SetRequired
   ]);
 
+  wbRecord(PLYT, 'Player Title', [
+    wbEDID,
+    wbXALG,
+    wbLStringKC(ANAM, 'Prefix', 0, cpTranslate),
+    wbLStringKC(BNAM, 'Suffix', 0, cpTranslate),
+    wbInteger(PTPR, 'Is Prefix', itU8, wbBoolEnum),
+    wbInteger(PTSU, 'Is Suffix', itU8, wbBoolEnum),
+    wbInteger(PTDS, 'Is Default Title', itU8, wbBoolEnum),
+    wbConditions
+  ]);
+
   wbAddGroupOrder(GMST);
   wbAddGroupOrder(KYWD);
   wbAddGroupOrder(ENTM); //new in Fallout 76
@@ -19167,10 +19238,11 @@ begin
   wbAddGroupOrder(QMDL); //new in Fallout 76
   wbAddGroupOrder(LOUT); //new in Fallout 76
   wbAddGroupOrder(DIST); //new in Fallout 76
+  wbAddGroupOrder(PLYT); //new in Fallout 76 1.7.17.9 //This is indeed tacked onto the end of the group order in the exe.
   wbNexusModsUrl := 'https://www.nexusmods.com/fallout76/mods/30';
   {if wbToolMode = tmLODgen then
     wbNexusModsUrl := '';}
-  wbHEDRVersion := 216.0;
+  wbHEDRVersion := 224.0;
 end;
 
 initialization
