@@ -404,6 +404,7 @@ function wbFromVersion(aVersion: Integer; const aValue: IwbValueDef): IwbValueDe
 function wbVec3(const aName: string = 'Unknown'; const aPrefix: string = ''): IwbValueDef; overload;
 function wbVec3(const aSignature: TwbSignature; const aName: string = 'Unknown'; const aPrefix: string = ''): IwbRecordMemberDef; overload;
 function wbVec3Pos(const aName: string = 'Position'; const aPrefix: string = 'Pos'): IwbValueDef; overload;
+function wbVec3PosTES3(const aName: string = 'Position'; const aPrefix: string = 'Pos'): IwbValueDef; overload;
 function wbVec3Pos(const aSignature: TwbSignature; const aName: string = 'Position'; const aPrefix: string = 'Pos'): IwbRecordMemberDef; overload;
 function wbVec3Rot(const aName: string = 'Rotation'; const aPrefix: string = 'Rot'): IwbValueDef; overload;
 function wbVec3Rot(const aSignature: TwbSignature; const aName: string = 'Rotation'; const aPrefix: string = 'Rot'): IwbRecordMemberDef; overload;
@@ -418,6 +419,7 @@ function wbAmbientColors(const aSignature: TwbSignature; const aName: string = '
 function wbAmbientColors(const aName: string = 'Directional Ambient Lighting Colors'): IwbStructDef; overload;
 function wbByteColors(const aSignature: TwbSignature; const aName: string = 'Color'): IwbRecordMemberDef; overload;
 function wbByteColors(const aName: string = 'Color'): IwbValueDef; overload;
+function wbByteColorsTES3(const aName: string = 'Color'): IwbValueDef; overload;
 function wbByteABGR(const aSignature: TwbSignature; const aName: string = 'Color'): IwbRecordMemberDef; overload;
 function wbByteABGR(const aName: string = 'Color'): IwbValueDef; overload;
 function wbByteRGBA(const aSignature: TwbSignature; const aName: string = 'Color'): IwbRecordMemberDef; overload;
@@ -2860,12 +2862,20 @@ begin
   if not wbTrySetContainer(aElement, aType, CER) then
     Exit;
 
+  var eSCDT := CER.ElementBySignature[SCDT];
   var eSCDA := CER.ElementBySignature[SCDA];
   var eSCTX := CER.ElementBySignature[SCTX];
 
-  if not Assigned(eSCDA) then begin
-    aValue := IfThen(Assigned(eSCTX), '<Source not compiled>', '<Empty>');
-    Exit;
+  if wbGameMode = gmTES3 then begin
+    if not (Assigned(eSCDT)) then begin
+      aValue := IfThen(Assigned(eSCTX), '<Source not compiled>', '<Empty>');
+      Exit;
+    end;
+  end else if wbGameMode > gmTES3 then begin
+    if not (Assigned(eSCDA)) then begin
+      aValue := IfThen(Assigned(eSCTX), '<Source not compiled>', '<Empty>');
+      Exit;
+    end;
   end;
 
   if not Assigned(eSCTX) then begin
@@ -4109,6 +4119,22 @@ begin
   Result := wbVec3(aName, aPrefix);
 end;
 
+//Because Morrowind is special :)
+function wbVec3PosTES3(const aName: string = 'Position'; const aPrefix: string = 'Pos'): IwbValueDef;
+begin
+  Result :=
+    wbStruct(aName, [
+      wbInteger('X', itS32),
+      wbInteger('Y', itS32),
+      wbInteger('Z', itS32)
+    ]).SetSummaryKey([0, 1, 2])
+      .SetSummaryMemberPrefixSuffix(0, aPrefix + '(', '')
+      .SetSummaryMemberPrefixSuffix(2, '', ')')
+      .SetSummaryDelimiter(', ')
+      .IncludeFlag(dfSummaryMembersNoName)
+      .IncludeFlag(dfCollapsed, wbCollapseVec3);
+end;
+
 function wbVec3Pos(const aSignature: TwbSignature; const aName: string = 'Position'; const aPrefix: string = 'Pos'): IwbRecordMemberDef;
 begin
   Result := wbSubRecord(aSignature, aName, wbVec3Pos(''));
@@ -4264,6 +4290,17 @@ begin
     wbInteger('Green', itU8),
     wbInteger('Blue', itU8),
     wbUnused(1)
+  ]).SetToStr(wbRGBAToStr)
+    .IncludeFlag(dfCollapsed, wbCollapseRGBA);
+end;
+
+//Because Morrowind is special :)
+function wbByteColorsTES3(const aName: string = 'Color'): IwbValueDef;
+begin
+  Result := wbStruct(aName, [
+    wbInteger('Red', itU32),
+    wbInteger('Green', itU32),
+    wbInteger('Blue', itU32)
   ]).SetToStr(wbRGBAToStr)
     .IncludeFlag(dfCollapsed, wbCollapseRGBA);
 end;
@@ -5702,7 +5739,8 @@ begin
            IsFO3 ('Stimpaks', '')),
       {7}  IsFO3 ('', 'Lights'),
       {8}  IsFO3 ('', 'Apparatus'),
-      {9}  IsTES4('Repair', ''),
+      {9}  IsTES3('Repair',
+           IsTES4('Repair', '')),
       {10}        'Miscellaneous',
       {11} IsFO3 ('', 'Spells'),
       {12} IsFO3 ('', 'Magic Items'),
