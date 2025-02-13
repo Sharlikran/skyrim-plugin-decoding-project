@@ -2862,20 +2862,12 @@ begin
   if not wbTrySetContainer(aElement, aType, CER) then
     Exit;
 
-  var eSCDT := CER.ElementBySignature[SCDT];
-  var eSCDA := CER.ElementBySignature[SCDA];
+  var eSCDA := [IfThen(wbGameMode <> gmTES3, SCDA, SCDT)];
   var eSCTX := CER.ElementBySignature[SCTX];
 
-  if wbGameMode = gmTES3 then begin
-    if not (Assigned(eSCDT)) then begin
-      aValue := IfThen(Assigned(eSCTX), '<Source not compiled>', '<Empty>');
-      Exit;
-    end;
-  end else if wbGameMode > gmTES3 then begin
-    if not (Assigned(eSCDA)) then begin
-      aValue := IfThen(Assigned(eSCTX), '<Source not compiled>', '<Empty>');
-      Exit;
-    end;
+  if not (Assigned(eSCDA)) then begin
+    aValue := IfThen(Assigned(eSCTX), '<Source not compiled>', '<Empty>');
+    Exit;
   end;
 
   if not Assigned(eSCTX) then begin
