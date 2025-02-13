@@ -575,7 +575,7 @@ begin
     if Supports(aMainRecord.Container, IwbGroupRecord, Container) then
       Cell := IwbGroupRecord(Container).ChildrenOf;
 
-    if Cell.IsPersistent and aMainRecord.GetPosition(Position) then begin
+    if Assigned(Cell) and Cell.IsPersistent and aMainRecord.GetPosition(Position) then begin
       Grid := wbPositionToGridCell(Position);
       Result := Result + ' at ' + IntToStr(Grid.X) + ',' + IntToStr(Grid.Y);
     end;
