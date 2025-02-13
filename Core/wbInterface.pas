@@ -5748,9 +5748,9 @@ begin
   e := wbEnum([], aFlags);
   SetLength(Result, 32);
   for i := 0 to 31 do
-    if i = 12 then
+    if (i = 12) and (wbGameMode > gmTES3) then
       Result[i] := 'Ignored'
-    else if aDeleted and (i = 5) then
+    else if aDeleted and (i = 5) and (wbGameMode > gmTES3) then
       Result[i] := 'Deleted'
     else begin
       s := e.ToString(i, nil, False);
@@ -8137,14 +8137,14 @@ begin
 end;
 
 function wbStringMgefCode(const aSignature : TwbSignature;
-                    const aName      : string;
-                          aSize      : Integer = 0;
-                          aPriority  : TwbConflictPriority = cpNormal;
-                          aRequired  : Boolean = False;
-                          aDontShow  : TwbDontShowCallback = nil;
-                          aAfterSet  : TwbAfterSetCallback = nil;
-                          aGetCP     : TwbGetConflictPriority = nil)
-                                     : IwbSubRecordWithBaseStringDef; overload;
+                          const aName      : string;
+                                aSize      : Integer = 0;
+                                aPriority  : TwbConflictPriority = cpNormal;
+                                aRequired  : Boolean = False;
+                                aDontShow  : TwbDontShowCallback = nil;
+                                aAfterSet  : TwbAfterSetCallback = nil;
+                                aGetCP     : TwbGetConflictPriority = nil)
+                                           : IwbSubRecordWithBaseStringDef; overload;
 begin
   Result := wbSubRecord(aSignature, aName, wbStringMgefCode('', aSize, aPriority), nil, aAfterSet, aPriority, aRequired, False, aDontShow, aGetCP) as IwbSubRecordWithBaseStringDef;
 end;
@@ -9631,8 +9631,8 @@ begin
 end;
 
 function wbFormIDST(const aValidRefs : TwbSignatures;
-                        aPersistent: Boolean)
-                                   : IwbFormID;
+                          aPersistent: Boolean)
+                                     : IwbFormID;
 begin
   Result := TwbFormIDCheckedST.Create(aValidRefs, [], aPersistent);
 end;
