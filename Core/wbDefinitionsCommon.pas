@@ -71,6 +71,8 @@ var
   wbHEDR: IwbRecordMemberDef;
   wbINOA: IwbRecordMemberDef;
   wbINOM: IwbRecordMemberDef;
+  wbQSTI: IwbRecordMemberDef;
+  wbQSTR: IwbRecordMemberDef;
   wbKWDAs: IwbRecordMemberDef;
   wbKeywords :IwbRecordMemberDef;
   wbMagicEffectSounds: IwbRecordMemberDef;
@@ -6034,6 +6036,14 @@ begin
     ).IncludeFlag(dfInternalEditOnly)
      .IncludeFlag(dfDontSave)
      .IncludeFlag(dfDontAssign);
+
+  wbQSTI :=
+    wbRArrayS('Associated Quests',
+      wbFormIDCkNoReach(QSTI, 'Associated Quest', [QUST], False, cpBenign));
+
+  wbQSTR :=
+    wbRArrayS('Removed Quests',
+      wbFormIDCkNoReach(QSTR, 'Removed Quest', [QUST], False, cpBenign));
 
 {>>>Landscape Common Defs<<<}
   //TES4,FO3,FNV,TES5,FO4,FO76,SF1

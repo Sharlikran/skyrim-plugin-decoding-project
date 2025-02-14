@@ -1677,8 +1677,16 @@ begin
       4, 'Optimized'
     ])), [
     wbHEDR,
-    wbByteArray(OFST, 'Unknown', 0, cpIgnore),
-    wbByteArray(DELE, 'Unknown', 0, cpIgnore),
+    IfThen(wbSimpleRecords,
+      wbByteArray(OFST, 'Form Load Order', 0, cpIgnore),
+      wbArray(OFST, 'Form Load Order',
+        wbStruct('Form', [
+          wbInteger('Index', itU8),
+          wbUnused(3), //Padding
+          wbString('Form Type', 4),
+          wbUnused(4) //Padding
+        ]), 0, nil, nil, cpIgnore).IncludeFlag(dfCollapsed, wbCollapseFlags)),
+    wbByteArray(DELE, 'Time Stamp', 8, cpIgnore),
     wbString(CNAM, 'Author', 0, cpTranslate).SetRequired,
     wbString(SNAM, 'Description', 0, cpTranslate),
     wbRArray('Master Files',
@@ -2028,7 +2036,7 @@ begin
   wbRecord(CREA, 'Creature',
     wbFlags(wbFlagsList([
       10, 'Quest Item',
-      19, 'Unknown 19'
+      19, 'Starts Dead'
     ])), [
     wbEDID,
     wbFULL,
@@ -2236,7 +2244,8 @@ begin
 
   wbRecord(DIAL, 'Dialog Topic', [
     wbEDID,
-    wbRArrayS('Quests', wbFormIDCkNoReach(QSTI, 'Quest', [QUST], False, cpBenign)),
+    wbQSTI,
+    wbQSTR,
     wbFULL,
     wbInteger(DATA, 'Type', itU8, wbDialogueTypeEnum).SetRequired,
     wbINOM,
@@ -2892,7 +2901,7 @@ begin
     wbFlags(wbFlagsList([
       10, 'Quest Item',
       18, 'Compressed',
-      19, 'Unknown 19'
+      19, 'Starts Dead'
     ])), [
     wbEDID,
     wbFULL,
@@ -3844,7 +3853,6 @@ begin
   //wbAddGroupOrder(PGRD);
   wbAddGroupOrder(WRLD);
   //wbAddGroupOrder(LAND);
-  //wbAddGroupOrder(TLOD);
   //wbAddGroupOrder(ROAD);
   wbAddGroupOrder(DIAL);
   //wbAddGroupOrder(INFO);
@@ -3857,7 +3865,6 @@ begin
   wbAddGroupOrder(ANIO);
   wbAddGroupOrder(WATR);
   wbAddGroupOrder(EFSH);
-  //wbAddGroupOrder(TOFT);
   wbNexusModsUrl := 'https://www.nexusmods.com/oblivion/mods/11536';
   if wbToolMode = tmLODgen then
     wbNexusModsUrl := 'https://www.nexusmods.com/oblivion/mods/15781';

@@ -4125,8 +4125,8 @@ begin
 
   wbRecord(DIAL, 'Dialog Topic', [
     wbEDIDReqKC,
-    wbRArrayS('Quests', wbFormIDCkNoReach(QSTI, 'Quest', [QUST], False, cpBenign)),
-    wbRArrayS('Quests?', wbFormIDCkNoReach(QSTR, 'Quest?', [QUST], False, cpBenign)),
+    wbQSTI,
+    wbQSTR,
     wbFULL,
     wbFloat(PNAM, 'Priority')
       .SetDefaultNativeValue(50)
