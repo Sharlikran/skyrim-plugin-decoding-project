@@ -2867,7 +2867,7 @@ begin
   var eSCDA := [IfThen(wbGameMode <> gmTES3, SCDA, SCDT)];
   var eSCTX := CER.ElementBySignature[SCTX];
 
-  if not (Assigned(eSCDA)) then begin
+  if not Assigned(eSCDA) then begin
     aValue := IfThen(Assigned(eSCTX), '<Source not compiled>', '<Empty>');
     Exit;
   end;
