@@ -36,10 +36,15 @@ var
   wbBipedObjects,
   wbDELE,
   wbENAM,
+  wbEffects,
   wbFNAM,
   wbMODL,
+  wbITEX,
   wbNAME,
+  wbDESC,
   wbSCRI,
+  wbItems,
+  wbSpells,
   wbTravelServices: IwbRecordMemberDef;
 
 const
@@ -126,23 +131,6 @@ begin
   end;
 end;
 
-function wbGLOBUnionDecider(aBasePtr: Pointer; aEndPtr: Pointer; const aElement: IwbElement): Integer;
-begin
-  Result := 0;
-  if not Assigned(aElement) then
-    Exit;
-  var rValue := aElement.Container.RecordBySignature[FNAM];
-  if Assigned(rValue) then begin
-    var s := rValue.Value;
-    if Length(s) > 0 then
-      case s[1] of
-        'S': Result := 0;
-        'L': Result := 1;
-        'F': Result := 2;
-      end;
-  end;
-end;
-
 function GridCellToFormID(aFormIDBase: Byte; const aGridCell: TwbGridCell; out aFormID: TwbFormID): Boolean;
 begin
   Result := False;
@@ -155,13 +143,37 @@ begin
 end;
 
 function wbNPCDataDecider(aBasePtr: Pointer; aEndPtr: Pointer; const aElement: IwbElement): Integer;
-var
-  SubRecord: IwbSubRecord;
 begin
   Result := 0;
-  if Assigned(aElement) and Supports(aElement.Container, IwbSubRecord, SubRecord) then
-    if SubRecord.SubRecordHeaderSize = 12 then
+  if Assigned(aElement) then
+    if aElement.DataSize = 12 then
       Result := 1;
+end;
+
+procedure wbCELLAfterLoad(const aElement: IwbElement);
+var
+  Container  : IwbContainerElementRef;
+  MainRecord : IwbMainRecord;
+  WaterHeight: Float32;
+begin
+  if wbBeginInternalEdit then try
+    if not wbTryGetContainerWithValidMainRecord(aElement, Container, MainRecord) then
+      Exit;
+
+    var IsInterior := (Container.ElementNativeValues['DATA\Flags'] and 1) <> 0;
+    if IsInterior then begin
+      var WHGTFloat := (MainRecord.ElementBySignature['WHGT']);
+      if not Assigned(WHGTFloat) then begin
+        WaterHeight := Container.ElementNativeValues['INTV'];
+        Container.RemoveElement('INTV');
+        Container.ElementNativeValues['WHGT'] := WaterHeight;
+      end;
+      Container.ElementNativeValues['DATA\Grid\X'] := 0;
+      Container.ElementNativeValues['DATA\Grid\Y'] := 0;
+    end;
+  finally
+    wbEndInternalEdit;
+  end;
 end;
 
 procedure DefineTES3;
@@ -444,8 +456,11 @@ begin
   wbDELE := wbInteger(DELE, 'Deleted', itU32, wbEnum(['Deleted']));
   wbFNAM := wbString(FNAM, 'Name');
   wbMODL := wbString(MODL, 'Model Filename');
+  wbITEX := wbString(ITEX, 'Inventory Image Filename');
   wbNAME := wbString(NAME, 'Editor ID');
-  wbSCRI := wbString(SCRI, 'Script');
+  wbSCRI := wbString(SCRI, 'Script'); //[SCPT]
+  wbENAM := wbString(ENAM, 'Enchanment'); //[ENCH]
+  wbDESC := wbString(DESC, 'Description');
 
   {>>> Record Members <<<}
 
@@ -463,15 +478,15 @@ begin
     wbRArray('Biped Objects',
       wbRStruct('Biped Object', [
         wbInteger(INDX, 'Body Part', itU8, wbBipedObjectEnum),
-        wbString(BNAM, 'Male Armor'), //[BODY]
-        wbString(CNAM, 'Female Armor') //[BODY]
+        wbString(BNAM, 'Male'), //[BODY]
+        wbString(CNAM, 'Female') //[BODY]
       ]).SetRequired);
 
-  wbENAM :=
+  wbEffects :=
     wbRArray('Effects',
       wbStruct(ENAM, 'Effect', [
-        wbInteger('Magic Effect', itU16, wbMagicEffectEnum), //[MGEF]
-        wbInteger('Skill', itS8, wbSkillEnum), //[SKIL]
+        wbInteger('Magic Effect', itU16, wbMagicEffectEnum),
+        wbInteger('Skill', itS8, wbSkillEnum),
         wbInteger('Attribute', itS8, wbAttributeEnum),
         wbInteger('Range', itU32,
           wbEnum([
@@ -495,6 +510,17 @@ begin
         wbStringForward(DNAM, 'Cell', 64)
       ]));
 
+  wbItems :=
+    wbRArray('Item Entries',
+      wbStruct(NPCO, 'Item Entry', [
+        wbInteger('Count', itS32),
+        wbString('Item', 32) //[ALCH, APPA, ARMO, BOOK, CLOT, INGR, LEVI, LIGH, LOCK, MISC, PROB, REPA, WEAP]
+      ]));
+
+  wbSpells :=
+    wbRArray('Spells',
+      wbString(NPCS, 'Spell', 32)); //[SPEL]
+
   {>>> Records <<<}
 
   wbRecord(TES3, 'Main File Header', wbFlags(wbFlagsList([
@@ -502,9 +528,10 @@ begin
     ])), [
     wbStruct(HEDR, 'Header', [
       wbFloat('Version', cpNormal, False, 1.0, 2),
-      wbInteger('Record Flags', itU32, wbFlags(wbFlagsList([
-        0, 'ESM'
-      ]))),
+      wbInteger('Record Flags', itU32, wbFlags
+        (wbFlagsList([
+          0, 'ESM'
+      ]))).IncludeFlag(dfCollapsed, wbCollapseFlags),
       wbString('Author', 32),
       wbString('Description', 256),
       wbInteger('Number of Records', itU32)
@@ -528,28 +555,28 @@ begin
     wbDELE,
     wbMODL,
     wbFNAM,
-    wbSCRI //[SCPT]
+    wbSCRI
   ]).SetFormIDBase($40);
 
-  wbRecord(ALCH, 'Alchemy', wbFlags(wbFlagsList([
+  wbRecord(ALCH, 'Alchemy Potion', wbFlags(wbFlagsList([
       10, 'References Persist',
       13, 'Blocked'
     ])), [
     wbNAME,
     wbDELE,
     wbMODL,
-    wbString(TEXT, 'Icon Filename'),
-    wbSCRI, //[SCPT]
+    wbString(TEXT, 'Inventory Image Filename'),
+    wbSCRI,
     wbFNAM,
     wbStruct(ALDT, 'Data', [
       wbFloat('Weight', cpNormal, False, 1.0, 2),
       wbInteger('Potion Value', itS32),
       wbInteger('Auto Calculate Value', itU32, wbBoolEnum)
     ]).SetRequired,
-    wbENAM
+    wbEffects
   ]).SetFormIDBase($40);
 
-  wbRecord(APPA, 'Apparatus', wbFlags(wbFlagsList([
+  wbRecord(APPA, 'Alchemical Apparatus', wbFlags(wbFlagsList([
       10, 'References Persist',
       13, 'Blocked'
     ])), [
@@ -557,7 +584,7 @@ begin
     wbDELE,
     wbMODL,
     wbFNAM,
-    wbSCRI, //[SCPT]
+    wbSCRI,
     wbStruct(AADT, 'Data', [
       wbInteger('Type', itU32,
         wbEnum([
@@ -570,7 +597,7 @@ begin
       wbFloat('Weight', cpNormal, False, 1.0, 2),
       wbInteger('Value', itS32)
     ]).SetRequired,
-    wbString(ITEX, 'Icon Filename')
+    wbITEX
   ]).SetFormIDBase($40);
 
   wbRecord(ARMO, 'Armor', wbFlags(wbFlagsList([
@@ -581,7 +608,7 @@ begin
     wbDELE,
     wbMODL,
     wbFNAM,
-    wbSCRI, //[SCPT]
+    wbSCRI,
     wbStruct(AODT, 'Data', [
       wbInteger('Type', itU32,
         wbEnum([
@@ -600,12 +627,12 @@ begin
       wbFloat('Weight', cpNormal, False, 1.0, 2),
       wbInteger('Value', itS32),
       wbInteger('Health', itS32),
-      wbInteger('Enchanting Charge', itS32),
+      wbInteger('Enchantment Charge', itS32),
       wbInteger('Armor Rating', itS32)
     ]).SetRequired,
-    wbString(ITEX, 'Icon Filename'),
+    wbITEX,
     wbBipedObjects,
-    wbString(ENAM, 'Enchantment') //[ENCH]
+    wbENAM
   ]).SetFormIDBase($40);
 
   wbRecord(BODY, 'Body Part', @wbKnownSubRecordSignaturesNoFNAM, wbFlags(wbFlagsList([
@@ -643,7 +670,7 @@ begin
         wbFlags([
           {0} 'Female',
           {1} 'Not Playable'
-        ])),
+        ])).IncludeFlag(dfCollapsed, wbCollapseFlags),
       wbInteger('Part Type', itU8,
         wbEnum([
           {0} 'Skin',
@@ -664,23 +691,23 @@ begin
     wbStruct(BKDT, 'Data', [
       wbFloat('Weight', cpNormal, False, 1.0, 2),
       wbInteger('Value', itS32),
-      wbInteger('Is Scroll', itU32, wbBoolEnum),
-      wbInteger('Teaches', itS32, wbSkillEnum), //[SKIL]
-      wbInteger('Enchanting Charge', itS32)
+      wbInteger('Scroll', itU32, wbBoolEnum),
+      wbInteger('Teaches', itS32, wbSkillEnum),
+      wbInteger('Enchantment Charge', itS32)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename'),
+    wbSCRI,
+    wbITEX,
     wbLStringKC(TEXT, 'Book Text'),
-    wbString(ENAM, 'Enchantment') //[ENCH]
+    wbENAM
   ]).SetFormIDBase($40);
 
   wbRecord(BSGN, 'Birthsign', [
     wbDELE,
     wbNAME,
     wbFNAM,
-    wbString(TNAM, 'Constellation Image'),
-    wbString(DESC, 'Description'),
-    wbRArray('Spells', wbStringForward(NPCS, 'Spell', 32)) //[SPEL]
+    wbString(TNAM, 'Constellation Image Filename'),
+    wbDESC,
+    wbSpells
   ]).SetFormIDBase($10);
 
   wbRecord(CELL, 'Cell', [
@@ -694,15 +721,15 @@ begin
           2, 'Illegal To Sleep Here',
           6, 'Has Map Color',
           7, 'Behave Like Exterior'
-        ], False, 8))),
+        ], False, 8))).IncludeFlag(dfCollapsed, wbCollapseFlags),
       wbStruct('Grid', [
         wbInteger('X', itS32),
         wbInteger('Y', itS32)
       ])
     ]).SetRequired,
-    wbInteger(INTV, 'Water Height (Old Format)', itS32),
-    wbString(RGNN, 'Region'),  //[REGN]
-    wbByteColors(NAM5, 'Map Color'),
+    wbInteger(INTV, 'Water Height', itS32, nil, cpIgnore),
+    wbString(RGNN, 'Region Weather Type'),  //[REGN]
+    wbByteColors(NAM5, 'Region Map Color'),
     wbFloat(WHGT, 'Water Height'),
     wbStruct(AMBI, 'Ambience', [
       wbByteColors('Ambient Color'),
@@ -730,7 +757,8 @@ begin
         Result := '<Exterior>' + GridCell.SortKey
       else
         Result := aMainRecord.EditorID;
-    end);
+    end)
+    .SetAfterLoad(wbCELLAfterLoad);
 
   wbRecord(CLAS, 'Class', [
     wbNAME,
@@ -763,7 +791,7 @@ begin
       wbInteger('Playable', itU32, wbBoolEnum),
       wbInteger('Service Flags', itU32, wbServiceFlags)
     ]).SetRequired,
-    wbString(DESC, 'Description')
+    wbDESC
   ]).SetFormIDBase($18);
 
   wbRecord(CLOT, 'Clothing', wbFlags(wbFlagsList([
@@ -789,12 +817,12 @@ begin
       ])),
       wbFloat('Weight', cpNormal, False, 1.0, 2),
       wbInteger('Value', itU16),
-      wbInteger('Enchanting Charge', itU16)
+      wbInteger('Enchantment Charge', itU16)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename'),
+    wbSCRI,
+    wbITEX,
     wbBipedObjects,
-    wbString(ENAM, 'Enchantment') //[ENCH]
+    wbENAM
   ]).SetFormIDBase($40);
 
   wbRecord(CONT, 'Container', wbFlags(wbFlagsList([
@@ -811,13 +839,9 @@ begin
         0, 'Organic',
         1, 'Respawns',
         3, 'Can Hold Items'
-      ], False, 4))),
-    wbSCRI, //[SCPT]
-    wbRArray('Item Entries',
-      wbStruct(NPCO, 'Item Entry', [
-        wbInteger('Count', itS32),
-        wbString('Item', 32) //[ALCH, APPA, ARMO, BOOK, CLOT, INGR, LEVI, LIGH, LOCK, MISC, PROB, REPA, WEAP]
-      ]))
+      ], False, 4))).IncludeFlag(dfCollapsed, wbCollapseFlags),
+    wbSCRI,
+    wbItems
   ]).SetFormIDBase($40);
 
   wbRecord(CREA, 'Creature', wbFlags(wbFlagsList([
@@ -829,7 +853,7 @@ begin
     wbMODL,
     wbString(CNAM, 'Sound Generator Creature'), //[CREA]
     wbFNAM,
-    wbSCRI, //[SCPT]
+    wbSCRI,
     wbStruct(NPDT, 'Data', [
       wbInteger('Type', itU32,
         wbEnum([
@@ -858,12 +882,20 @@ begin
         wbInteger('Magic', itS32),
         wbInteger('Stealth', itS32)
       ]),
-      wbArray('Attack Sets',
-        wbStruct('Attack Set', [
+      wbStruct('Attack Sets', [
+        wbStruct('Attack Set 1', [
           wbInteger('Minimum', itS32),
           wbInteger('Maximum', itS32)
         ]),
-      3),
+        wbStruct('Attack Set 2', [
+          wbInteger('Minimum', itS32),
+          wbInteger('Maximum', itS32)
+        ]),
+        wbStruct('Attack Set 3', [
+          wbInteger('Minimum', itS32),
+          wbInteger('Maximum', itS32)
+        ])
+      ]),
       wbInteger('Barter Gold', itU32)
     ]).SetRequired,
     wbInteger(FLAG, 'Flags', itU32,
@@ -881,24 +913,20 @@ begin
       ], False, 12))
     ).IncludeFlag(dfCollapsed, wbCollapseFlags),
     wbFloat(XSCL, 'Scale', cpNormal, False, 1.0, 2),
-    wbRArray('Item Entries',
-      wbStruct(NPCO, 'Item Entry', [
-        wbInteger('Count', itS32),
-        wbString('Item', 32) //[ALCH, APPA, ARMO, BOOK, CLOT, INGR, LEVI, LIGH, LOCK, MISC, PROB, REPA, WEAP]
-      ])),
-    wbRArray('Spells', wbString(NPCS, 'Spell', 32)), //[SPEL]
+    wbItems,
+    wbSpells,
     wbAIDT,
     wbTravelServices,
     wbRArray('AI Packages',
       wbRUnion('AI Packages', [
         wbStruct(AI_T, 'AI Travel', [
-          wbVec3('Position'),
+          wbVec3('Location'),
           wbInteger('Reset', itU8, wbBoolEnum),
           wbUnused(3)
         ]).SetRequired,
         wbStruct(AI_W, 'AI Wander', [
           wbInteger('Distance', itU16),
-          wbInteger('Duration In Hours', itU16),
+          wbInteger('Duration(In Hours)', itU16),
           wbInteger('Time of Day', itU8),
           wbStruct('Idle Chances', [
             wbInteger('Idle 2', itU8),
@@ -912,28 +940,23 @@ begin
           ]),
           wbInteger('Reset', itU8, wbBoolEnum)
         ]).SetRequired,
-        wbRStruct('AI Escort', [
-          wbStruct(AI_E, 'AI Escort', [
-            wbVec3('Position'),
-            wbInteger('Duration In Hours', itU16),
-            wbString(True, 'Target', 32), //[CREA, NPC_]
-            wbInteger('Reset', itU16, wbBoolEnum)
-          ]).SetRequired,
-          wbString(CNDT, 'Escort To Cell') //[CELL]
-        ]),
-        wbRStruct('AI Follow', [
-          wbStruct(AI_F, 'AI Follow', [
-            wbVec3('Position'),
-            wbInteger('Duration In Hours', itU16),
-            wbString(True, 'Target', 32), //[CREA, NPC_]
-            wbInteger('Reset', itU16, wbBoolEnum)
-          ]).SetRequired,
-          wbString(CNDT, 'Follow To Cell') //[CELL]
-        ]),
+        wbStruct(AI_E, 'AI Escort', [
+          wbVec3('Specific Point'),
+          wbInteger('Duration(In Hours)', itU16),
+          wbString(True, 'Target', 32), //[CREA, NPC_]
+          wbInteger('Reset', itU16, wbBoolEnum)
+        ]).SetRequired,
+        wbStruct(AI_F, 'AI Follow', [
+          wbVec3('Specific Point'),
+          wbInteger('Duration(In Hours)', itU16),
+          wbString(True, 'Target', 32), //[CREA, NPC_]
+          wbInteger('Reset', itU16, wbBoolEnum)
+        ]).SetRequired,
         wbStruct(AI_A, 'AI Activate', [
           wbString(True, 'Target', 32), //[ACTI, ALCH, APPA, ARMO, BODY, BOOK, CLOT, CONT, CREA, DOOR, ENCH, INGR, LIGH, LEVC, LEVI, LOCK, MISC, NPC_, PROB, REPA, SPEL, STAT, WEAP]
           wbInteger('Reset', itU8, wbBoolEnum)
-        ]).SetRequired
+        ]).SetRequired,
+        wbString(CNDT, 'Escort/Follow To Cell') //[CELL]
       ]))
   ]).SetFormIDBase($40);
 
@@ -980,30 +1003,31 @@ begin
           $0000FFFE, 'N/A - Constant Effect'
       ]))
     ]).SetRequired,
-    wbENAM
+    wbEffects
   ]).SetFormIDBase($04);
 
   wbRecord(FACT, 'Faction', [
     wbNAME,
     wbDELE,
-    wbString(FNAM, 'Name'),
-    wbRArray('Ranks', wbStringForward(RNAM, 'Rank', 32)),
+    wbFNAM,
+    wbRArray('Rank Titles',
+      wbStringForward(RNAM, 'Rank Title', 32)),
     wbStruct(FADT, 'Data', [
-      wbArray('Attributes',
-        wbInteger('Attribute', itS32, wbAttributeEnum),
-      2),
-      wbArray('Ranks',
-        wbStruct('Rank', [
-          wbArray('Attribute Values',
-            wbInteger('Attribute Value', itU32),
-          2),
-          wbInteger('Primary Skills Value', itU32),
-          wbInteger('Favored Skills Value', itU32),
+      wbStruct('Favored Attributes', [
+        wbInteger('Attribute 1', itS32, wbAttributeEnum),
+        wbInteger('Attribute 2', itS32, wbAttributeEnum)
+      ]),
+      wbArray('Rank Modifiers',
+        wbStruct('Rank Modifier', [
+          wbInteger('Favored Attribute 1', itU32),
+          wbInteger('Favored Attribute 2', itU32),
+          wbInteger('Primary Skills', itU32),
+          wbInteger('Favored Skills', itU32),
           wbInteger('Faction Reputation', itU32)
         ]),
       10),
       wbArray('Favored Skills',
-        wbInteger('Skill', itS32, wbSkillEnum),
+        wbInteger('Favored Skill', itS32, wbSkillEnum),
       7),
       wbInteger('Hidden From Player', itU32, wbBoolEnum)
     ]).SetRequired,
@@ -1023,19 +1047,15 @@ begin
         $6C, 'Long',
         $73, 'Short'
       ])),
-    wbUnion(FLTV, 'Value', wbGLOBUnionDecider, [
-      wbFloat('Value - Short'),
-      wbFloat('Value - Long'),
-      wbFloat('Value - Float')
-    ])
+    wbFloat(FLTV, 'Value')
   ]).SetFormIDBase($58);
 
   wbRecord(GMST, 'Game Setting', [
     wbNAME,
     wbRUnion('Value', [
-      wbString(STRV, 'Value - String'),
-      wbInteger(INTV, 'Value - Signed Integer', itS32),
-      wbFloat(FLTV, 'Value - Float')
+      wbString(STRV, 'Value'),
+      wbInteger(INTV, 'Value', itS32),
+      wbFloat(FLTV, 'Value')
     ])
   ]).SetFormIDBase($50)
     .IncludeFlag(dfIndexEditorID);
@@ -1048,7 +1068,7 @@ begin
       wbInteger('Dialog Type', itU32, wbDialogTypeEnum),
       wbInteger('Disposition/Index', itU32),
       wbInteger('Speaker Faction Rank', itS8),
-      wbInteger('Gender', itS8, wbSexEnum),
+      wbInteger('Sex', itS8, wbSexEnum),
       wbInteger('Player Faction Rank', itS8),
       wbUnused(1)
     ]).SetRequired,
@@ -1062,14 +1082,14 @@ begin
     wbString(NAME, 'Response'),
     wbDELE,
     wbRStruct('Quest Data', [
-      wbInteger(QSTN, 'Quest Named', itU8,
-        wbEnum([], [1, 'Quest Named'])
+      wbInteger(QSTN, 'Named', itU8,
+        wbEnum([], [1, 'Named'])
       ).SetDefaultNativeValue(1),
-      wbInteger(QSTF, 'Quest Finished', itU8,
-        wbEnum([], [1, 'Quest Finished'])
+      wbInteger(QSTF, 'Finished', itU8,
+        wbEnum([], [1, 'Finished'])
       ).SetDefaultNativeValue(1),
-      wbInteger(QSTR, 'Quest Restarted', itU8,
-        wbEnum([], [1, 'Quest Restarted'])
+      wbInteger(QSTR, 'Restarted', itU8,
+        wbEnum([], [1, 'Restarted'])
       ).SetDefaultNativeValue(1)
     ], [], cpNormal, False, nil, True),
     wbRArray('Conditions',
@@ -1209,7 +1229,7 @@ begin
         wbArray('Skills',
           wbInteger('Skill', itS32,
             wbEnum([
-              {0}  'Block (None for Attribute based Magic Effects)',
+              {0}  'Block (or None)',
               {1}  'Armorer',
               {2}  'Medium Armor',
               {3}  'Heavy Armor',
@@ -1243,7 +1263,7 @@ begin
         wbArray('Attributes',
           wbInteger('Attribute', itS32,
             wbEnum([
-              {0} 'Strength (None for Skill based Magic Effects)',
+              {0} 'Strength (or None)',
               {1} 'Intelligence',
               {2} 'Willpower',
               {3} 'Agility',
@@ -1257,8 +1277,8 @@ begin
         4)
       ])
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename')
+    wbSCRI,
+    wbITEX
   ]).SetFormIDBase($40);
 
   wbRecord(LAND, 'Landscape', @wbKnownSubRecordSignaturesLAND, [
@@ -1272,7 +1292,7 @@ begin
         {1} 'Has Vertex Colors',
         {2} 'Has Landscape Textures',
         {3} 'User Created/Edited'
-      ])),
+      ])).IncludeFlag(dfCollapsed, wbCollapseFlags),
     IfThen(wbSimpleRecords,
       wbByteArray(VNML, 'Vertex Normals'),
       wbArray(VNML, 'Vertex Normals',
@@ -1324,8 +1344,8 @@ begin
            .IncludeFlag(dfCollapsed),
       65)).SetSummaryName('Rows'),
     IfThen(wbSimpleRecords,
-      wbByteArray(VTXT, 'Textures'),
-      wbArray(VTEX, 'Textures',
+      wbByteArray(VTEX, 'Landscape Textures'),
+      wbArray(VTEX, 'Landscape Textures',
         wbArray('Row',
           wbInteger('Column', itU16), //[LTEX]
         16).SetSummaryName('Columns')
@@ -1349,7 +1369,7 @@ begin
     ])), [
     wbNAME,
     wbDELE,
-    wbInteger(DATA, 'Leveled Flags', itU32, wbLeveledFlags),
+    wbInteger(DATA, 'Leveled Flags', itU32, wbLeveledFlags).IncludeFlag(dfCollapsed, wbCollapseFlags),
     wbInteger(NNAM, 'Chance None', itU8),
     wbInteger(INDX, 'Entry Count', itU32),
     wbRArray('Leveled Creature Entries',
@@ -1364,7 +1384,7 @@ begin
     ])), [
     wbNAME,
     wbDELE,
-    wbInteger(DATA, 'Levelved Flags', itU32, wbLeveledFlags),
+    wbInteger(DATA, 'Levelved Flags', itU32, wbLeveledFlags).IncludeFlag(dfCollapsed, wbCollapseFlags),
     wbInteger(NNAM, 'Chance None', itU8),
     wbInteger(INDX, 'Entry Count', itU32),
     wbRArray('Leveled Item Entries',
@@ -1382,7 +1402,7 @@ begin
     wbDELE,
     wbMODL,
     wbFNAM,
-    wbString(ITEX, 'Icon Filename'),
+    wbITEX,
     wbStruct(LHDT, 'Data', [
       wbFloat('Weight', cpNormal, False, 1.0, 2),
       wbInteger('Value', itS32),
@@ -1402,7 +1422,7 @@ begin
           {8} 'Pulse Slow'
         ])).IncludeFlag(dfCollapsed, wbCollapseFlags)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
+    wbSCRI,
     wbString(SNAM, 'Sound') //[SOUN]
   ]).SetFormIDBase($40);
 
@@ -1420,8 +1440,8 @@ begin
       wbFloat('Quality', cpNormal, False, 1.0, 2),
       wbInteger('Uses', itS32)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename')
+    wbSCRI,
+    wbITEX
   ]).SetFormIDBase($40);
 
   wbRecord(LTEX, 'Landscape Texture', [
@@ -1470,7 +1490,7 @@ begin
       wbFloat('Speed Multiplier', cpNormal, False, 1.0, 2),
       wbFloat('Size Cap', cpNormal, False, 1.0, 2)
     ]).SetRequired,
-    wbString(ITEX, 'Effect Texture Filename'),
+    wbITEX,
     wbString(PTEX, 'Particle Texture Filename'),
     wbString(BSND, 'Bolt Sound'), //[SOUN]
     wbString(CSND, 'Cast Sound'), //[SOUN]
@@ -1480,7 +1500,7 @@ begin
     wbString(BVFX, 'Bolt Visual'), //[WEAP]
     wbString(HVFX, 'Hit Visual'), //[STAT]
     wbString(AVFX, 'Area Visual'), //[STAT]
-    wbString(DESC, 'Description')
+    wbDESC
   ]).SetFormIDBase($02);
 
   wbRecord(MISC, 'Miscellaneous Item', wbFlags(wbFlagsList([
@@ -1497,8 +1517,8 @@ begin
       //This bool is only set true if the object is used in a KNAM on a REFR.
       wbInteger('Is Used As Key', itU32, wbBoolEnum)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename')
+    wbSCRI,
+    wbITEX
   ]).SetFormIDBase($40);
 
   wbRecord(NPC_, 'Non-Player Character', wbFlags(wbFlagsList([
@@ -1514,68 +1534,66 @@ begin
     wbString(ANAM, 'Faction'), //[FACT]
     wbString(BNAM, 'Head Body Part'), //[BODY]
     wbString(KNAM, 'Hair Body Part'), //[BODY]
-    wbSCRI, //[SCPT]
-    wbStruct(NPDT, 'Data', [
-      wbUnion('Calculated Format', wbNPCDataDecider, [
-        wbStruct('Non-Auto', [
-          wbInteger('Level', itS16),
-          wbStruct('Attributes', [
-            wbInteger('Strength', itU8),
-            wbInteger('Intelligence', itU8),
-            wbInteger('Willpower', itU8),
-            wbInteger('Agility', itU8),
-            wbInteger('Speed', itU8),
-            wbInteger('Endurance', itU8),
-            wbInteger('Personality', itU8),
-            wbInteger('Luck', itU8)
-          ]),
-          wbStruct('Skills', [
-            wbInteger('Block', itU8),
-            wbInteger('Armorer', itU8),
-            wbInteger('Medium Armor', itU8),
-            wbInteger('Heavy Armor', itU8),
-            wbInteger('Blunt Weapon', itU8),
-            wbInteger('Long Blade', itU8),
-            wbInteger('Axe', itU8),
-            wbInteger('Spear', itU8),
-            wbInteger('Athletics', itU8),
-            wbInteger('Enchant', itU8),
-            wbInteger('Destruction', itU8),
-            wbInteger('Alteration', itU8),
-            wbInteger('Illusion', itU8),
-            wbInteger('Conjuration', itU8),
-            wbInteger('Mysticism', itU8),
-            wbInteger('Restoration', itU8),
-            wbInteger('Alchemy', itU8),
-            wbInteger('Unarmored', itU8),
-            wbInteger('Security', itU8),
-            wbInteger('Sneak', itU8),
-            wbInteger('Acrobatics', itU8),
-            wbInteger('Light Armor', itU8),
-            wbInteger('Short Blade', itU8),
-            wbInteger('Marksman', itU8),
-            wbInteger('Speechcraft', itU8),
-            wbInteger('Mercantile', itU8),
-            wbInteger('Hand-to-Hand', itU8)
-          ]),
-          wbUnused(1),
-          wbInteger('Health', itU16),
-          wbInteger('Magicka', itU16),
-          wbInteger('Fatigue', itU16),
-          wbInteger('Disposition', itU8),
-          wbInteger('Reputation', itU8),
-          wbInteger('Rank', itU8),
-          wbUnused(1),
-          wbInteger('Gold', itU32)
+    wbSCRI,
+    wbUnion(NPDT, 'Data', wbNPCDataDecider, [
+      wbStruct('Stats', [
+        wbInteger('Level', itS16),
+        wbStruct('Attributes', [
+          wbInteger('Strength', itU8),
+          wbInteger('Intelligence', itU8),
+          wbInteger('Willpower', itU8),
+          wbInteger('Agility', itU8),
+          wbInteger('Speed', itU8),
+          wbInteger('Endurance', itU8),
+          wbInteger('Personality', itU8),
+          wbInteger('Luck', itU8)
         ]),
-        wbStruct('Auto', [
-          wbInteger('Level', itU16),
-          wbInteger('Disposition', itU8),
-          wbInteger('Reputation', itU8),
-          wbInteger('Rank', itU8),
-          wbUnused(3),
-          wbInteger('Gold', itU32)
-        ])
+        wbStruct('Skills', [
+          wbInteger('Block', itU8),
+          wbInteger('Armorer', itU8),
+          wbInteger('Medium Armor', itU8),
+          wbInteger('Heavy Armor', itU8),
+          wbInteger('Blunt Weapon', itU8),
+          wbInteger('Long Blade', itU8),
+          wbInteger('Axe', itU8),
+          wbInteger('Spear', itU8),
+          wbInteger('Athletics', itU8),
+          wbInteger('Enchant', itU8),
+          wbInteger('Destruction', itU8),
+          wbInteger('Alteration', itU8),
+          wbInteger('Illusion', itU8),
+          wbInteger('Conjuration', itU8),
+          wbInteger('Mysticism', itU8),
+          wbInteger('Restoration', itU8),
+          wbInteger('Alchemy', itU8),
+          wbInteger('Unarmored', itU8),
+          wbInteger('Security', itU8),
+          wbInteger('Sneak', itU8),
+          wbInteger('Acrobatics', itU8),
+          wbInteger('Light Armor', itU8),
+          wbInteger('Short Blade', itU8),
+          wbInteger('Marksman', itU8),
+          wbInteger('Speechcraft', itU8),
+          wbInteger('Mercantile', itU8),
+          wbInteger('Hand-To-Hand', itU8)
+        ]),
+        wbUnused(1),
+        wbInteger('Health', itU16),
+        wbInteger('Magicka', itU16),
+        wbInteger('Fatigue', itU16),
+        wbInteger('Disposition', itU8),
+        wbInteger('Reputation', itU8),
+        wbInteger('Rank', itU8),
+        wbUnused(1),
+        wbInteger('Gold', itU32)
+      ]),
+      wbStruct('Auto Calculated Stats', [
+        wbInteger('Level', itU16),
+        wbInteger('Disposition', itU8),
+        wbInteger('Reputation', itU8),
+        wbInteger('Rank', itU8),
+        wbUnused(3),
+        wbInteger('Gold', itU32)
       ])
     ]).SetRequired,
     wbInteger(FLAG, 'Flags', itU32,
@@ -1587,13 +1605,9 @@ begin
         4, 'Auto Calculate Stats',
         10, 'Skeleton Blood',
         11, 'Metal Blood'
-      ], False, 12))),
-    wbRArray('Item Entries',
-      wbStruct(NPCO, 'Item Entry', [
-        wbInteger('Count', itS32),
-        wbString('Item', 32) //[ALCH, APPA, ARMO, BOOK, CLOT, INGR, LEVI, LIGH, LOCK, MISC, PROB, REPA, WEAP]
-      ])),
-    wbRArray('Spells', wbString(NPCS, 'Spell', 32)), //[SPEL]
+      ], False, 12))).IncludeFlag(dfCollapsed, wbCollapseFlags),
+    wbItems,
+    wbSpells,
     wbAIDT,
     wbTravelServices,
     wbRArray('AI Packages',
@@ -1619,28 +1633,23 @@ begin
           ]),
           wbInteger('Reset', itU8, wbBoolEnum)
         ]).SetRequired,
-        wbRStruct('AI Escort', [
-          wbStruct(AI_E, 'AI Escort', [
-            wbVec3('Position'),
-            wbInteger('Duration In Hours', itU16),
-            wbString(True, 'Target', 32), //[CREA, NPC_]
-            wbInteger('Reset', itU16, wbBoolEnum)
-          ]).SetRequired,
-          wbString(CNDT, 'Escort To Cell') //[CELL]
-        ]),
-        wbRStruct('AI Follow', [
-          wbStruct(AI_F, 'AI Follow', [
-            wbVec3('Position'),
-            wbInteger('Duration In Hours', itU16),
-            wbString(True, 'Target', 32), //[CREA, NPC_]
-            wbInteger('Reset', itU16, wbBoolEnum)
-          ]).SetRequired,
-          wbString(CNDT, 'Follow To Cell') //[CELL]
-        ]),
+        wbStruct(AI_E, 'AI Escort', [
+          wbVec3('Position'),
+          wbInteger('Duration In Hours', itU16),
+          wbString(True, 'Target', 32), //[CREA, NPC_]
+          wbInteger('Reset', itU16, wbBoolEnum)
+        ]).SetRequired,
+        wbStruct(AI_F, 'AI Follow', [
+          wbVec3('Position'),
+          wbInteger('Duration In Hours', itU16),
+          wbString(True, 'Target', 32), //[CREA, NPC_]
+          wbInteger('Reset', itU16, wbBoolEnum)
+        ]).SetRequired,
         wbStruct(AI_A, 'AI Activate', [
           wbString(True, 'Target', 32), //[ACTI, ALCH, APPA, ARMO, BODY, BOOK, CLOT, CONT, CREA, DOOR, ENCH, INGR, LIGH, LEVC, LEVI, LOCK, MISC, NPC_, PROB, REPA, SPEL, STAT, WEAP]
           wbInteger('Reset', itU8, wbBoolEnum)
-        ]).SetRequired
+        ]).SetRequired,
+        wbString(CNDT, 'Escort/Follow To Cell') //[CELL]
       ])),
     wbFloat(XSCL, 'Scale', cpNormal, False, 1.0, 2)
   ]).SetFormIDBase($40);
@@ -1650,7 +1659,7 @@ begin
       wbStruct('Grid', [
         wbInteger('X', itS32),
         wbInteger('Y', itS32)
-      ], cpCritical),
+      ]),
       wbInteger('Granularity', itU16),
       wbInteger('Grid Point Count', itU16)
     ]).SetRequired,
@@ -1707,8 +1716,8 @@ begin
       wbFloat('Quality', cpNormal, False, 1.0, 2),
       wbInteger('Uses', itS32)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename')
+    wbSCRI,
+    wbITEX
   ]).SetFormIDBase($40);
 
   wbRecord(RACE, 'Race', [
@@ -1770,8 +1779,8 @@ begin
           {1} 'Beast Race'
         ])).IncludeFlag(dfCollapsed, wbCollapseFlags)
     ]).SetRequired,
-    wbRArray('Spells', wbStringForward(NPCS, 'Spell', 32)),
-    wbString(DESC, 'Description')
+    wbSpells,
+    wbDESC
   ]).SetFormIDBase($14);
 
   wbRecord(REFR, 'Reference', @wbKnownSubRecordSignaturesREFR, [
@@ -1789,7 +1798,7 @@ begin
       wbString(CNAM, 'Faction Owner'), //[FACT]
       wbInteger(INDX, 'Faction Rank', itS32)
     ], [], cpNormal, False, nil, True),
-    wbFloat(XCHG, 'Enchanting Charge', cpNormal, False, 1.0, 0),
+    wbFloat(XCHG, 'Enchantment Charge', cpNormal, False, 1.0, 0),
     wbString(XSOL, 'Soul'), //[CREA]
     wbInteger(INTV, 'Health', itS32),
     wbInteger(NAM9, 'Count', itS32),
@@ -1814,7 +1823,8 @@ begin
       wbVec3('Position'),
       wbVec3('Rotation')
     ])
-  ]).SetGetFormIDCallback(function(const aMainRecord: IwbMainRecord; out aFormID: TwbFormID): Boolean begin
+  ]).SetGetFormIDCallback(function(const aMainRecord: IwbMainRecord; out aFormID: TwbFormID): Boolean
+    begin
       var lFRMR := aMainRecord.RecordBySignature[FRMR];
       Result := Assigned(lFRMR);
       if Result then begin
@@ -1841,9 +1851,9 @@ begin
       wbInteger('Blizzard', itU8)
     ], cpNormal, True, nil, 8),
     wbString(BNAM, 'Sleep Creature'), //[LEVC]
-    wbByteColors(CNAM, 'Map Color'),
-    wbRArray('Sound Records',
-      wbStruct(SNAM, 'Sound Record', [
+    wbByteColors(CNAM, 'Region Map Color'),
+    wbRArray('Region Sounds',
+      wbStruct(SNAM, 'Region Sound', [
         wbString(True, 'Sound', 32), //[SOUN]
         wbInteger('Chance', itS8)
       ]))
@@ -1863,8 +1873,8 @@ begin
       wbInteger('Uses', itS32),
       wbFloat('Quality', cpNormal, False, 1.0, 2)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename')
+    wbSCRI,
+    wbITEX
   ]).SetFormIDBase($40);
 
   wbRecord(SCPT, 'Script', @wbKnownSubRecordSignaturesSCPT, [
@@ -1878,7 +1888,8 @@ begin
       wbInteger('Local Variable Size', itU32)
     ]).SetRequired,
     wbDELE,
-    wbArray(SCVR, 'Script Variables', wbString('Script Variable', 0, cpCritical)),
+    wbArray(SCVR, 'Script Variables',
+      wbString('Script Variable', 0, cpCritical)),
     wbByteArray(SCDT, 'Compiled Script'),
     wbStringScript(SCTX, 'Script Source').SetRequired
   ]).SetFormIDBase($30)
@@ -1893,13 +1904,16 @@ begin
   wbRecord(SKIL, 'Skill', @wbKnownSubRecordSignaturesINDX, [
     wbInteger(INDX, 'Name', itU32, wbSkillEnum),
     wbStruct(SKDT, 'Data', [
-      wbInteger('Attribute', itS32, wbAttributeEnum),
-      wbInteger('Type', itU32, wbSpecializationEnum),
-      wbArray('Actions',
-        wbFloat('Action', cpNormal, False, 1.0, 2),
-      4)
+      wbInteger('Governing Attribute', itS32, wbAttributeEnum),
+      wbInteger('Specialization', itU32, wbSpecializationEnum),
+      wbStruct('Actions', [
+        wbFloat('Action 1', cpNormal, False, 1.0, 2),
+        wbFloat('Action 2', cpNormal, False, 1.0, 2),
+        wbFloat('Action 3', cpNormal, False, 1.0, 2),
+        wbFloat('Action 4', cpNormal, False, 1.0, 2)
+      ])
     ]).SetRequired,
-    wbString(DESC, 'Description')
+    wbDESC
   ]).SetFormIDBase($01);
 
   wbRecord(SNDG, 'Sound Generator', [
@@ -1925,13 +1939,13 @@ begin
     wbDELE,
     wbString(FNAM, 'Sound Filename'),
     wbStruct(DATA, 'Data', [
-      wbInteger('Volume', itU8),
+      wbInteger('Volume', itU8, wbDiv(255, 2)),
       wbInteger('Minimum Range', itU8),
       wbInteger('Maximum Range', itU8)
     ]).SetRequired
   ]).SetFormIDBase($40);
 
-  wbRecord(SPEL, 'Spellmaking', wbFlags(wbFlagsList([
+  wbRecord(SPEL, 'Spell', wbFlags(wbFlagsList([
       13, 'Blocked'
     ])), [
     wbNAME,
@@ -1955,7 +1969,7 @@ begin
           {2} 'Always Succeeds'
         ])).IncludeFlag(dfCollapsed, wbCollapseFlags)
     ]).SetRequired,
-    wbENAM
+    wbEffects
   ]).SetFormIDBase($0A);
 
   wbRecord(SSCR, 'Start Script', @wbKnownSubRecordSignaturesSSCR, [
@@ -2006,7 +2020,7 @@ begin
       wbInteger('Health', itU16),
       wbFloat('Speed', cpNormal, False, 1.0, 2),
       wbFloat('Reach', cpNormal, False, 1.0, 2),
-      wbInteger('Enchanting Charge', itU16),
+      wbInteger('Enchantment Charge', itU16),
       wbStruct('Damage Types', [
         wbStruct('Chop', [
           wbInteger('Minimum', itU8),
@@ -2027,9 +2041,9 @@ begin
           {1} 'Ignore Normal Weapon Resistance'
         ])).IncludeFlag(dfCollapsed, wbCollapseFlags)
     ]).SetRequired,
-    wbSCRI, //[SCPT]
-    wbString(ITEX, 'Icon Filename'),
-    wbString(ENAM, 'Enchantment') //[ENCH]
+    wbSCRI,
+    wbITEX,
+    wbENAM
   ]).SetFormIDBase($40);
 
   wbAddGroupOrder(GMST);

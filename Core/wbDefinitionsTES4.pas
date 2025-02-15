@@ -1691,7 +1691,7 @@ begin
     wbString(SNAM, 'Description', 0, cpTranslate),
     wbRArray('Master Files',
       wbRStruct('Master File', [
-        wbStringForward(MAST, 'FileName').SetRequired,
+        wbStringForward(MAST, 'Filename').SetRequired,
         wbUnused(DATA, 8).SetRequired
       ])).IncludeFlag(dfInternalEditOnly, not wbAllowMasterFilesEdit)
   ], False, nil, cpNormal, True);
@@ -1746,7 +1746,7 @@ begin
     wbFormIDCk(SNAM, 'Sound', [SOUN])
   ]);
 
-  wbRecord(ALCH, 'Potion',
+  wbRecord(ALCH, 'Alchemy Potion',
     wbFlags(wbFlagsList([
       10, 'Quest Item'
     ])), [
@@ -1881,7 +1881,7 @@ begin
   wbRecord(BSGN, 'Birthsign', [
     wbEDID.SetRequired,
     wbFULL,
-    wbICON,
+    wbString(ICON, 'Constellation Image Filename'),
     wbDESC.SetRequired,
     wbSPLOs
   ]);
@@ -1940,7 +1940,7 @@ begin
     wbEDID.SetRequired,
     wbFULL,
     wbDESC.SetRequired,
-    wbICON,
+    wbString(ICON, 'Menu Image Filename'),
     wbStruct(DATA, 'Data', [
       wbStruct('Primary Attributes', [
         wbInteger('Attribute #1', itU32, wbAttributeEnum),
@@ -2029,8 +2029,8 @@ begin
       ).IncludeFlag(dfCollapsed, wbCollapseFlags),
       wbFloat('Weight')
     ]).SetRequired,
-    wbFormIDCk(SNAM, 'Open sound', [SOUN]),
-    wbFormIDCk(QNAM, 'Close sound', [SOUN])
+    wbFormIDCk(SNAM, 'Open Sound', [SOUN]),
+    wbFormIDCk(QNAM, 'Close Sound', [SOUN])
   ]);
 
   wbRecord(CREA, 'Creature',
@@ -2260,9 +2260,9 @@ begin
     wbFULL,
     wbTexturedModel('Model', [MODL, MODB, MODT], []),
     wbSCRI,
-    wbFormIDCk(SNAM, 'Open sound', [SOUN]),
-    wbFormIDCk(ANAM, 'Close sound', [SOUN]),
-    wbFormIDCk(BNAM, 'Loop sound', [SOUN]),
+    wbFormIDCk(SNAM, 'Open Sound', [SOUN]),
+    wbFormIDCk(ANAM, 'Close Sound', [SOUN]),
+    wbFormIDCk(BNAM, 'Loop Sound', [SOUN]),
     wbInteger(FNAM, 'Flags', itU8,
       wbFlags([
         {0} 'Oblivion gate',
@@ -3551,7 +3551,7 @@ begin
 
   wbRecord(SOUN, 'Sound', [
     wbEDID,
-    wbString(FNAM, 'Sound FileName'),
+    wbString(FNAM, 'Sound Filename'),
     wbRUnion('Sound Data', [
       wbStruct(SNDX, 'Sound Data', wbSoundDataMembers, cpNormal, True, nil, 6),
       wbStruct(SNDD, 'Sound Data', wbSoundDataMembers, cpNormal, True, nil, 6)

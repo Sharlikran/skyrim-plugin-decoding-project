@@ -4730,8 +4730,9 @@ function wbStringEnumSummary(const aNames       : array of string;
                                                 : IwbStringDefFormater; overload;
 
 
-function wbDiv(aValue : Integer)
-                      : IwbIntegerDefFormater;
+function wbDiv(aValue     : Integer;
+               aPrecision : Integer = wbFloatDigits)
+                          : IwbIntegerDefFormater;
 function wbMul(aValue : Integer)
                       : IwbIntegerDefFormater;
 function wbCallback(const aToStr : TwbIntToStrCallback;
@@ -7675,9 +7676,10 @@ type
   TwbDivDef = class(TwbIntegerDefFormater)
   private
     ddValue: Integer;
+    ddPrecision: Integer;
   protected
     constructor Clone(const aSource: TwbDef); override;
-    constructor Create(aValue: Integer);
+    constructor Create(aValue: Integer; aPrecision: Integer);
 
     {---IwbIntegerDefFormater---}
     function ToString(aInt: Int64; const aElement: IwbElement; aForSummary: Boolean): string; override;
@@ -8137,14 +8139,14 @@ begin
 end;
 
 function wbStringMgefCode(const aSignature : TwbSignature;
-                    const aName      : string;
-                          aSize      : Integer = 0;
-                          aPriority  : TwbConflictPriority = cpNormal;
-                          aRequired  : Boolean = False;
-                          aDontShow  : TwbDontShowCallback = nil;
-                          aAfterSet  : TwbAfterSetCallback = nil;
-                          aGetCP     : TwbGetConflictPriority = nil)
-                                     : IwbSubRecordWithBaseStringDef; overload;
+                          const aName      : string;
+                                aSize      : Integer = 0;
+                                aPriority  : TwbConflictPriority = cpNormal;
+                                aRequired  : Boolean = False;
+                                aDontShow  : TwbDontShowCallback = nil;
+                                aAfterSet  : TwbAfterSetCallback = nil;
+                                aGetCP     : TwbGetConflictPriority = nil)
+                                           : IwbSubRecordWithBaseStringDef; overload;
 begin
   Result := wbSubRecord(aSignature, aName, wbStringMgefCode('', aSize, aPriority), nil, aAfterSet, aPriority, aRequired, False, aDontShow, aGetCP) as IwbSubRecordWithBaseStringDef;
 end;
@@ -9991,10 +9993,11 @@ begin
   Result := TwbEnumDef.Create(True, aNames, aSparseNames);
 end;
 
-function wbDiv(aValue : Integer)
-                      : IwbIntegerDefFormater;
+function wbDiv(aValue     : Integer;
+               aPrecision : Integer = wbFloatDigits)
+                          : IwbIntegerDefFormater;
 begin
-  Result := TwbDivDef.Create(aValue);
+  Result := TwbDivDef.Create(aValue, aPrecision);
 end;
 
 function wbMul(aValue : Integer)
@@ -19134,12 +19137,13 @@ end;
 constructor TwbDivDef.Clone(const aSource: TwbDef);
 begin
   with aSource as TwbDivDef do
-    Self.Create(ddValue).AfterClone(aSource);
+    Self.Create(ddValue, ddPrecision).AfterClone(aSource);
 end;
 
-constructor TwbDivDef.Create(aValue: Integer);
+constructor TwbDivDef.Create(aValue: Integer; aPrecision: Integer);
 begin
   ddValue := aValue;
+  ddPrecision := aPrecision;
   inherited Create;
 end;
 
@@ -19158,7 +19162,7 @@ end;
 
 function TwbDivDef.ToEditValue(aInt: Int64; const aElement: IwbElement): string;
 begin
-  Result := FloatToStrF(aInt / ddValue, ffFixed, 99, wbFloatDigits);
+  Result := FloatToStrF(aInt / ddValue, ffFixed, 99, ddPrecision);
 end;
 
 function TwbDivDef.ToSortKey(aInt: Int64; const aElement: IwbElement): string;
@@ -19170,7 +19174,7 @@ end;
 
 function TwbDivDef.ToString(aInt: Int64; const aElement: IwbElement; aForSummary: Boolean): string;
 begin
-  Result := FloatToStrF(aInt / ddValue, ffFixed, 99, wbFloatDigits);
+  Result := FloatToStrF(aInt / ddValue, ffFixed, 99, ddPrecision);
   Used(aElement, Result);
 end;
 
