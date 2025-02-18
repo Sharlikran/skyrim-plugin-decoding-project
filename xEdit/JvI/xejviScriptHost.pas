@@ -576,6 +576,14 @@ begin
     FilterName := Value;
     Done := True;
   end else
+  if SameText(Identifier, 'FilterByElementValue') then begin
+    FilterByElementValue := Value;
+    Done := True;
+  end else
+  if SameText(Identifier, 'FilterElementValue') then begin
+    FilterElementValue := Value;
+    Done := True;
+  end else
   if SameText(Identifier, 'FilterByBaseEditorID') then begin
     FilterByBaseEditorID := Value;
     Done := True;

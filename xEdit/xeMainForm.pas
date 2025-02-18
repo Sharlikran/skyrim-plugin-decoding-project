@@ -963,6 +963,9 @@ type
     FilterByEditorID: Boolean;
     FilterEditorID: string;
 
+    FilterByElementValue: Boolean;
+    FilterElementValue: string;
+
     FilterByName: Boolean;
     FilterName: string;
 
@@ -11263,6 +11266,7 @@ begin
     FilterByReferencesInjectedStatus or
     FilterByEditorID or
     FilterByName or
+    FilterByElementValue or
     FilterBySignature or
     FilterByBaseEditorID or
     FilterByBaseName or
@@ -11560,6 +11564,7 @@ begin
     FilterByReferencesInjectedStatus or
     FilterByEditorID or
     FilterByName or
+    FilterByElementValue or
     FilterBySignature or
     FilterByBaseEditorID or
     FilterByBaseName or
@@ -12994,6 +12999,9 @@ begin
       FilterByEditorID := cbByEditorID.Checked;
       FilterEditorID := edEditorID.Text;
 
+      FilterByElementValue := cbByElementValue.Checked;
+      FilterElementValue := edElementValue.Text;
+
       FilterByName := cbByName.Checked;
       FilterName := edName.Text;
 
@@ -13220,6 +13228,7 @@ begin
     FilterRequiresReference or
     FilterByEditorID or
     FilterByName or
+    FilterByElementValue or
     Assigned(Signatures) or
     FilterDeleted or
     FilterScripted;
@@ -13243,6 +13252,28 @@ begin
         Boolean(Script.CallFunction('Filter', [MainRecord]));
     end;
 
+    function CheckContainerForElementValue(const aElement: IwbElement; const aValue: string): Boolean;
+    var
+      Container: IwbContainerElementRef;
+      i: integer;
+    begin
+      Result := False;
+      if not Assigned(aElement) then Exit;
+
+      if not Supports(aElement, IwbContainerElementRef, Container) then Exit;
+
+      if Container.ElementCount = 0 then
+      begin
+        if Pos(aValue, UpperCase(aElement.Value)) > 0 then
+          Result := True;
+      end
+      else
+        for i := 0 to Pred(Container.ElementCount) do
+        begin
+          Result := CheckContainerForElementValue(Container.Elements[i], aValue);
+          if Result then Break;
+        end;
+    end;
   var
     i: Integer;
   begin
@@ -13278,6 +13309,7 @@ begin
                 (Assigned(Signatures) and not Signatures.Find(MainRecord.Signature, Dummy)) or
                 (FilterByEditorID and (Pos(AnsiUpperCase(FilterEditorID), AnsiUpperCase(MainRecord.EditorID)) < 1)) or
                 (FilterByName and (Pos(AnsiUpperCase(FilterName), AnsiUpperCase(MainRecord.DisplayName[True])) < 1)) or
+                (FilterByElementValue and not CheckContainerForElementValue(MainRecord, UpperCase(FilterElementValue))) or
 
                 (FilterRequiresReference and
                   (
