@@ -1053,7 +1053,7 @@ begin
   if not wbTryGetContainerRefFromUnionOrValue(aElement, Container) then
     Exit;
 
-  if not wbTryGetMainRecord(Container.ElementByName['Parameter #1'], MainRecord) then
+  if not wbTryGetMainRecord(Container.ElementByName['Quest'], MainRecord) then
     Exit;
 
   MainRecord := MainRecord.WinningOverride;
