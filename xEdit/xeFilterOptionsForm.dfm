@@ -3,12 +3,11 @@ object frmFilterOptions: TfrmFilterOptions
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Filter...'
-  ClientHeight = 718
+  ClientHeight = 750
   ClientWidth = 935
   Color = clBtnFace
   ParentFont = True
   KeyPreview = True
-  OldCreateOrder = False
   Position = poMainFormCenter
   OnClose = FormClose
   OnCreate = FormCreate
@@ -20,7 +19,7 @@ object frmFilterOptions: TfrmFilterOptions
     Left = 0
     Top = 0
     Width = 935
-    Height = 677
+    Height = 715
     Align = alClient
     BevelOuter = bvNone
     ParentColor = True
@@ -399,10 +398,25 @@ object frmFilterOptions: TfrmFilterOptions
       Caption = 'only Has Precombined Mesh'
       TabOrder = 43
     end
+    object cbByElementValue: TCheckBox
+      Left = 12
+      Top = 661
+      Width = 145
+      Height = 17
+      Caption = 'Element value contains'
+      TabOrder = 44
+    end
+    object edElementValue: TEdit
+      Left = 36
+      Top = 684
+      Width = 121
+      Height = 23
+      TabOrder = 45
+    end
   end
   object pnlBottom: TPanel
     Left = 0
-    Top = 677
+    Top = 715
     Width = 935
     Height = 41
     Align = alBottom

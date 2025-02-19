@@ -75,6 +75,8 @@ type
     btnFilterSave: TButton;
     cbByHasPrecombinedMesh: TCheckBox;
     cbHasPrecombinedMesh: TCheckBox;
+    cbByElementValue: TCheckBox;
+    edElementValue: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure mniSelectionClick(Sender: TObject);
     procedure cmbPresetSelect(Sender: TObject);
@@ -301,6 +303,9 @@ begin
   if cbByBaseEditorID.Checked <> Settings.ReadBool(Section, 'ByBaseEditorID', False) then Exit;
   if edBaseEditorID.Text <> Settings.ReadString(Section, 'BaseEditorID', '') then Exit;
 
+  if cbByElementValue.Checked <> Settings.ReadBool(Section, 'ByElementValue', False) then Exit;
+  if edElementValue.Text <> Settings.ReadString(Section, 'ElementValue', '') then Exit;
+
   if cbByBaseName.Checked <> Settings.ReadBool(Section, 'ByBaseName', False) then Exit;
   if edBaseName.Text <> Settings.ReadString(Section, 'BaseName', '') then Exit;
 
@@ -463,6 +468,9 @@ begin
   cbByBaseName.Checked := Settings.ReadBool(Section, 'ByBaseName', False);
   edBaseName.Text := Settings.ReadString(Section, 'BaseName', '');
 
+  cbByElementValue.Checked := Settings.ReadBool(Section, 'ByElementValue', False);
+  edElementvalue.Text := Settings.ReadString(Section, 'ElementValue', '');
+
   cbScaledActors.Checked := Settings.ReadBool(Section, 'ScaledActors', False);
 
   cbRecordSignature.Checked := Settings.ReadBool(Section, 'BySignature', False);
@@ -545,6 +553,9 @@ begin
 
   Settings.WriteBool(Section, 'ByBaseName', cbByBaseName.Checked);
   Settings.WriteString(Section, 'BaseName', edBaseName.Text);
+
+  Settings.WriteBool(Section, 'ByElementValue', cbByElementValue.Checked);
+  Settings.WriteString(Section, 'ElementValue', edElementValue.Text);
 
   Settings.WriteBool(Section, 'ScaledActors', cbScaledActors.Checked);
 
